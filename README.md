@@ -9,7 +9,7 @@ Source code for the paper: Scalable Graph Neural Network for NMR Chemical Shift 
 - **gnn_models/** - gnn model architectures
 - **dataset.py** - data structure & functions
 - **main.py** - script for overall running code
-- **model.py** - training functions for gnn model
+- **model.py** - training and inference functions for gnn model
 - **train.py** - script for model training
 - **util.py**
 
