@@ -3,6 +3,7 @@ Source code for the paper: Scalable Graph Neural Network for NMR Chemical Shift 
 
 ## Data
 - **NMRShiftDB2** - https://nmrshiftdb.nmr.uni-koeln.de/
+- The dataset can be downloaded from https://nmrshiftdb.nmr.uni-koeln.de/portal/js_pane/P-Help
 
 ## Components
 - **data/nmrshiftdb2_get_data.py** - data preprocessing functions
