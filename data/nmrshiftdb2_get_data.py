@@ -25,13 +25,6 @@ rdBase.DisableLog('rdApp.error')
 rdBase.DisableLog('rdApp.warning')
 chem_feature_factory = ChemicalFeatures.BuildFeatureFactory(os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef'))
 
-def get_num_total_Hs(a):
-    valence = a.GetExplicitValence()
-    valence = np.where(valence > 4, valence % 4, valence)
-    numHs = np.array(Chem.GetPeriodicTable().GetValenceList(a.GetAtomicNum())[0]-valence+a.GetFormalCharge()+a.GetNumExplicitHs())
-    numHs = np.clip(numHs, 0, 5)
-    return numHs
-
 def get_atom_shifts_13C(mol):
     
     molprops = mol.GetPropsAsDict()
@@ -50,7 +43,6 @@ def get_atom_shifts_13C(mol):
                 atom_shifts[shift_idx].append(shift_val)
 
     return atom_shifts
-
 
 
 def get_atom_shifts_1H(mol):
@@ -72,25 +64,16 @@ def get_atom_shifts_1H(mol):
                 if shift_idx not in tmp_dict: tmp_dict[shift_idx] = []
                 tmp_dict[shift_idx].append(shift_val)
                 
-
             for shift_idx in tmp_dict.keys():
                 tmp_dict[shift_idx] = np.mean(tmp_dict[shift_idx])
                 
                 if shift_idx not in atom_shifts: atom_shifts[shift_idx] = []
                 atom_shifts[shift_idx].append(tmp_dict[shift_idx])
 
-            
-
-
     return atom_shifts
 
 
-
-
-
-def add_mol(mol_dict, mol, target):
-
-    def _DA(mol):
+def _DA(mol):
 
         D_list, A_list = [], []
         for feat in chem_feature_factory.GetFeaturesForMol(mol):
@@ -99,64 +82,43 @@ def add_mol(mol_dict, mol, target):
         
         return D_list, A_list
 
-    def _chirality(atom):
+def _chirality(atom):
 
-        if atom.HasProp('Chirality'):
-            #assert atom.GetProp('Chirality') in ['Tet_CW', 'Tet_CCW']
-            c_list = [(atom.GetProp('Chirality') == 'Tet_CW'), (atom.GetProp('Chirality') == 'Tet_CCW')] 
-        else:
-            c_list = [0, 0]
+    if atom.HasProp('Chirality'):
+        c_list = [(atom.GetProp('Chirality') == 'Tet_CW'), (atom.GetProp('Chirality') == 'Tet_CCW')] 
+    else:
+        c_list = [0, 0]
 
-        return c_list
-        
+    return c_list
+    
 
-    def _stereochemistry(bond):
+def _stereochemistry(bond):
 
-        if bond.HasProp('Stereochemistry'):
-            #assert bond.GetProp('Stereochemistry') in ['Bond_Cis', 'Bond_Trans']
-            s_list = [(bond.GetProp('Stereochemistry') == 'Bond_Cis'), (bond.GetProp('Stereochemistry') == 'Bond_Trans')] 
-        else:
-            s_list = [0, 0]
+    if bond.HasProp('Stereochemistry'):
+        s_list = [(bond.GetProp('Stereochemistry') == 'Bond_Cis'), (bond.GetProp('Stereochemistry') == 'Bond_Trans')] 
+    else:
+        s_list = [0, 0]
 
-        return s_list    
+    return s_list    
 
+def add_mol_sparsified_graph(mol_dict, mol):
 
     n_node = mol.GetNumAtoms()
     n_edge = mol.GetNumBonds() * 2
 
     D_list, A_list = _DA(mol)
-    rings = mol.GetRingInfo().AtomRings()
     
-    if target == '13C':
-    
-        atom_fea1 = np.eye(len(atom_list), dtype = bool)[[atom_list.index(a.GetSymbol()) for a in mol.GetAtoms()]] # 31
-        atom_fea2 = np.eye(len(charge_list), dtype = bool)[[charge_list.index(a.GetFormalCharge()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea3 = np.eye(len(degree_list), dtype = bool)[[degree_list.index(a.GetDegree()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea4 = np.eye(len(hybridization_list), dtype = bool)[[hybridization_list.index(str(a.GetHybridization())) for a in mol.GetAtoms()]][:,:-2] # 5
-        #atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(get_num_total_Hs(a)) for a in mol.GetAtoms()]][:,:-1] # 4
-        atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(a.GetTotalNumHs()) for a in mol.GetAtoms()]][:,:-1]
-        atom_fea6 = np.eye(len(valence_list), dtype = bool)[[valence_list.index(a.GetTotalValence()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea7 = np.array([[(j in D_list), (j in A_list)] for j in range(mol.GetNumAtoms())], dtype = bool) # 2
-        atom_fea8 = np.array([_chirality(a) for a in mol.GetAtoms()], dtype = bool) # 2
-        atom_fea9 = np.array([[a.IsInRingSize(s) for s in ringsize_list] for a in mol.GetAtoms()], dtype = bool) # 6
-        atom_fea10 = np.array([[a.GetIsAromatic(), a.IsInRing()] for a in mol.GetAtoms()], dtype = bool) # 2
-        # 31 + 6 + 6 + 5 + 4 + 6 + 2 + 2 + 6 + 2 = 70
-        node_attr = np.concatenate([atom_fea1, atom_fea2, atom_fea3, atom_fea4, atom_fea5, atom_fea6, atom_fea7, atom_fea8, atom_fea9, atom_fea10], 1)
-
-    elif target == '1H':
-        atom_fea1 = np.eye(len(atom_list), dtype = bool)[[atom_list.index(a.GetSymbol()) for a in mol.GetAtoms()]] # 31
-        atom_fea2 = np.eye(len(charge_list), dtype = bool)[[charge_list.index(a.GetFormalCharge()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea3 = np.eye(len(degree_list), dtype = bool)[[degree_list.index(a.GetDegree()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea4 = np.eye(len(hybridization_list), dtype = bool)[[hybridization_list.index(str(a.GetHybridization())) for a in mol.GetAtoms()]][:,:-2] # 5
-        #atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(get_num_total_Hs(a)) for a in mol.GetAtoms()]][:,:-1] # 4
-        atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(a.GetTotalNumHs()) for a in mol.GetAtoms()]][:,:-1]
-        atom_fea6 = np.eye(len(valence_list), dtype = bool)[[valence_list.index(a.GetTotalValence()) for a in mol.GetAtoms()]][:,:-1] # 6
-        atom_fea7 = np.array([[(j in D_list), (j in A_list)] for j in range(mol.GetNumAtoms())], dtype = bool) # 2
-        atom_fea8 = np.array([_chirality(a) for a in mol.GetAtoms()], dtype = bool) # 2
-        atom_fea9 = np.array([[a.IsInRingSize(s) for s in ringsize_list] for a in mol.GetAtoms()], dtype = bool) # 6
-        atom_fea10 = np.array([[a.GetIsAromatic(), a.IsInRing()] for a in mol.GetAtoms()], dtype = bool) # 2
-        # 31 + 6 + 6 + 5 + 4 + 6 + 2 + 2 + 6 + 2 = 70
-        node_attr = np.concatenate([atom_fea1, atom_fea2, atom_fea3, atom_fea4, atom_fea5, atom_fea6, atom_fea7, atom_fea8, atom_fea9, atom_fea10], 1)
+    atom_fea1 = np.eye(len(atom_list), dtype = bool)[[atom_list.index(a.GetSymbol()) for a in mol.GetAtoms()]]
+    atom_fea2 = np.eye(len(charge_list), dtype = bool)[[charge_list.index(a.GetFormalCharge()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea3 = np.eye(len(degree_list), dtype = bool)[[degree_list.index(a.GetDegree()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea4 = np.eye(len(hybridization_list), dtype = bool)[[hybridization_list.index(str(a.GetHybridization())) for a in mol.GetAtoms()]][:,:-2]
+    atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(a.GetTotalNumHs()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea6 = np.eye(len(valence_list), dtype = bool)[[valence_list.index(a.GetTotalValence()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea7 = np.array([[(j in D_list), (j in A_list)] for j in range(mol.GetNumAtoms())], dtype = bool)
+    atom_fea8 = np.array([_chirality(a) for a in mol.GetAtoms()], dtype = bool)
+    atom_fea9 = np.array([[a.IsInRingSize(s) for s in ringsize_list] for a in mol.GetAtoms()], dtype = bool)
+    atom_fea10 = np.array([[a.GetIsAromatic(), a.IsInRing()] for a in mol.GetAtoms()], dtype = bool)
+    node_attr = np.concatenate([atom_fea1, atom_fea2, atom_fea3, atom_fea4, atom_fea5, atom_fea6, atom_fea7, atom_fea8, atom_fea9, atom_fea10], 1)
 
     shift = np.array([atom.GetDoubleProp('shift') for atom in mol.GetAtoms()])
     mask = np.array([atom.GetBoolProp('mask') for atom in mol.GetAtoms()])
@@ -164,11 +126,6 @@ def add_mol(mol_dict, mol, target):
     mol_dict['n_node'].append(n_node)
     mol_dict['n_edge'].append(n_edge)
     mol_dict['node_attr'].append(node_attr)
-
-    #n_Hs = np.sum([(get_num_total_Hs(a)) for a in mol.GetAtoms()])
-    #n_node_w_H = n_node + n_Hs
-    #mol_dict['n_node_w_H'].append(n_node_w_H)
-
 
     mol_dict['shift'].append(shift)
     mol_dict['mask'].append(mask)
@@ -193,9 +150,90 @@ def add_mol(mol_dict, mol, target):
     
     return mol_dict
 
+def add_mol_fully_connected_graph(mol_dict, mol):
+
+    def _edge_features(bid1, bid2, mol, rings):
+        atom_idx = [a.GetIdx() for a in mol.GetAtoms()]
+        
+        bondpath = Chem.GetShortestPath(mol, bid1, bid2)
+        bonds = [mol.GetBondBetweenAtoms(bondpath[t], bondpath[t + 1]) for t in range(len(bondpath) - 1)]
+
+        samering = 0
+        for ring in rings:
+            if bid1 in ring and bid2 in ring:
+                samering = 1
+
+        if len(bonds)==1:
+            b = mol.GetBondBetweenAtoms(atom_idx[bid1], atom_idx[bid2])
+            edge_fea1 = np.eye(len(bond_list), dtype = bool)[bond_list.index(str(b.GetBondType()))]
+            edge_fea2 = np.array(_stereochemistry(b), dtype = bool)
+            edge_fea3 = np.array([b.IsInRing(), b.GetIsConjugated()])
+        else:
+            edge_fea1 = np.zeros(4)
+            edge_fea2 = np.zeros(2)
+            edge_fea3 = np.zeros(2)
+
+        edge_fea4 = np.array([len(bonds), samering])
+            
+        return np.concatenate([edge_fea1, edge_fea2, edge_fea3, edge_fea4], axis=0)
+
+    n_node = mol.GetNumAtoms()
+    n_edge = n_node * (n_node -1)
+
+    D_list, A_list = _DA(mol)
+    rings = mol.GetRingInfo().AtomRings()
+    
+    atom_fea1 = np.eye(len(atom_list), dtype = bool)[[atom_list.index(a.GetSymbol()) for a in mol.GetAtoms()]]
+    atom_fea2 = np.eye(len(charge_list), dtype = bool)[[charge_list.index(a.GetFormalCharge()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea3 = np.eye(len(degree_list), dtype = bool)[[degree_list.index(a.GetDegree()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea4 = np.eye(len(hybridization_list), dtype = bool)[[hybridization_list.index(str(a.GetHybridization())) for a in mol.GetAtoms()]][:,:-2]
+    atom_fea5 = np.eye(len(hydrogen_list), dtype = bool)[[hydrogen_list.index(a.GetTotalNumHs()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea6 = np.eye(len(valence_list), dtype = bool)[[valence_list.index(a.GetTotalValence()) for a in mol.GetAtoms()]][:,:-1]
+    atom_fea7 = np.array([[(j in D_list), (j in A_list)] for j in range(mol.GetNumAtoms())], dtype = bool)
+    atom_fea8 = np.array([_chirality(a) for a in mol.GetAtoms()], dtype = bool)
+    atom_fea9 = np.array([[a.IsInRingSize(s) for s in ringsize_list] for a in mol.GetAtoms()], dtype = bool)
+    atom_fea10 = np.array([[a.GetIsAromatic(), a.IsInRing()] for a in mol.GetAtoms()], dtype = bool)
+    node_attr = np.concatenate([atom_fea1, atom_fea2, atom_fea3, atom_fea4, atom_fea5, atom_fea6, atom_fea7, atom_fea8, atom_fea9, atom_fea10], 1)
+
+    shift = np.array([atom.GetDoubleProp('shift') for atom in mol.GetAtoms()])
+    mask = np.array([atom.GetBoolProp('mask') for atom in mol.GetAtoms()])
+
+    mol_dict['n_node'].append(n_node)
+    mol_dict['n_edge'].append(n_edge)
+    mol_dict['node_attr'].append(node_attr)
+
+    mol_dict['shift'].append(shift)
+    mol_dict['mask'].append(mask)
+    mol_dict['smi'].append(Chem.MolToSmiles(mol))
+    
+    if n_edge > 0:
+
+        edge_attr = []
+        edge_loc = [[],[]]
+        for j in range(n_node):
+            for k in range(j+1, n_node):
+                edge_attr.append(_edge_features(j, k, mol, rings))
+                edge_loc[0].append(j)
+                edge_loc[1].append(k)
+        edge_attr = np.vstack([edge_attr, edge_attr])
+        edge_loc = np.array(edge_loc)
+        src = np.hstack([edge_loc[0,:], edge_loc[1,:]])
+        dst = np.hstack([edge_loc[1,:], edge_loc[0,:]])
+        
+        mol_dict['edge_attr'].append(edge_attr)
+        mol_dict['src'].append(src)
+        mol_dict['dst'].append(dst)
+    
+    return mol_dict
+
+
+
+
+
 def preprocess(args):
     length = len(molsuppl)
     target = args.target
+    graph_representation = args.graph_representation
 
     mol_dict = {'n_node': [],
                 'n_edge': [],
@@ -243,15 +281,18 @@ def preprocess(args):
         if 'H' in [at.GetSymbol() for at in mol.GetAtoms()]:
             continue
         
+        
+        if graph_representation == 'sparsified':
+            mol_dict = add_mol_sparsified_graph(mol_dict, mol)
 
-        mol_dict = add_mol(mol_dict, mol, target)
+        elif graph_representation == 'fully_connected':
+            mol_dict = add_mol_fully_connected_graph(mol_dict, mol)
 
         
         if (i+1)%1000==0: 
             print(f'{i+1}/{length} processed')
 
     mol_dict['n_node'] = np.array(mol_dict['n_node']).astype(int)
-    #mol_dict['n_node_w_H'] = np.array(mol_dict['n_node_w_H']).astype(int)
     mol_dict['n_edge'] = np.array(mol_dict['n_edge']).astype(int)
     mol_dict['node_attr'] = np.vstack(mol_dict['node_attr']).astype(bool)
     mol_dict['edge_attr'] = np.vstack(mol_dict['edge_attr']).astype(bool)
@@ -263,7 +304,7 @@ def preprocess(args):
 
     for key in mol_dict.keys(): print(key, mol_dict[key].shape, mol_dict[key].dtype)
         
-    np.savez_compressed('./data/nmrshiftdb2_graph_%s_bond.npz'%target, data = [mol_dict])
+    np.savez_compressed('./data/nmrshiftdb2_graph_%s_%s.npz'%(graph_representation, target), data = [mol_dict])
 
     
 

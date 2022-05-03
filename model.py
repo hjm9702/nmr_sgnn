@@ -13,8 +13,6 @@ from sklearn.metrics import mean_absolute_error
         
 def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_path, n_forward_pass = 5, cuda = torch.device('cuda:0')):
 
-    train_size = train_loader.dataset.__len__()
-    batch_size = train_loader.batch_size
 
     optimizer = Adam(net.parameters(), lr=1e-3, weight_decay=1e-10)
     lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, min_lr=1e-6, verbose=True)
@@ -37,10 +35,7 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
             shifts = shifts.to(cuda)
             masks = masks.to(cuda)
             
-            #predictions = net(inputs, n_nodes, masks)
-            
             pred = net(inputs, n_nodes, masks)
-            # Modified Loss
             loss = torch.abs(pred - shifts).mean()
             
             optimizer.zero_grad()
@@ -48,8 +43,6 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
             optimizer.step()
             
             train_loss = loss.detach().item() * train_y_std
-
-        #print('--- training epoch %d, processed %d/%d, loss %.3f, time elapsed(min) %.2f' %(epoch,  train_size, train_size, train_loss, (time.time()-start_time)/60))
     
         # validation
         val_y = np.hstack([inst[-2][inst[-1]] for inst in iter(val_loader.dataset)])
@@ -86,7 +79,6 @@ def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass = 30, 
             masks = batchdata[3].to(cuda)
 
             mean_list = []
-            var_list = []
 
             for _ in range(n_forward_pass):
                 mean = net(inputs, n_nodes, masks)

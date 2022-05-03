@@ -1,17 +1,18 @@
+# This code is based on the implementation of Path-Augmented Graph Transformer Network in DGL-LifeSci
+# https://github.com/awslabs/dgl-lifesci/blob/master/python/dgllife/model/gnn/pagtn.py
+
 import torch
 import torch.nn as nn
 
 from dgl.nn.pytorch import Set2Set
 
-
 from dgl.nn.functional import edge_softmax
 import dgl.function as fn
 
-class nmrPAGTN(nn.Module):
+class nmr_mpnn_PROPOSED(nn.Module):
 
-    def __init__(self, node_in_feats, edge_feats, embed_mode, 
+    def __init__(self, node_in_feats, edge_feats, readout_mode, 
                  node_out_feats = 256, 
-                 node_feats = 256,
                  node_hid_feats = 256,
                  depth=5,
                  n_heads=5,
@@ -20,9 +21,9 @@ class nmrPAGTN(nn.Module):
                  pred_hidden_feats = 512, prob_dropout = 0.1,
                  ):
         
-        super(nmrPAGTN, self).__init__()
+        super(nmr_mpnn_PROPOSED, self).__init__()
 
-        self.embed_mode = embed_mode
+        self.readout_mode = readout_mode
 
         
         self.gnn = PAGTNGNN(node_in_feats, node_out_feats,
@@ -30,27 +31,27 @@ class nmrPAGTN(nn.Module):
                               depth, n_heads, dropout, activation)
         
 
-        self.readout = Set2Set(input_dim = node_hid_feats + node_in_feats,
+        self.readout_g = Set2Set(input_dim = node_hid_feats + node_in_feats,
                                n_iters = 3,
                                n_layers = 1)
 
      
 
-        self.predict = nn.Sequential(
+        self.readout_n = nn.Sequential(
             nn.Linear(node_hid_feats * 3 + node_in_feats * 3, pred_hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(pred_hidden_feats, pred_hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(pred_hidden_feats, 1)
         )
 
 
-        self.predict_naive = nn.Sequential(
+        self.readout_n_naive = nn.Sequential(
             nn.Linear(node_hid_feats + node_in_feats, pred_hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(pred_hidden_feats, pred_hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(pred_hidden_feats, 1)
         )       
 
 
-    def forward(self, g, n_nodes, masks, get_node_weight=False):
+    def forward(self, g, n_nodes, masks):
         
         def embed(g):
             
@@ -67,21 +68,15 @@ class nmrPAGTN(nn.Module):
         node_embed_feats = embed(g)
         
         
-        if self.embed_mode == 'naive':
-            out = self.predict_naive(node_embed_feats[masks])
+        if self.readout_mode == 'baseline':
+            out = self.readout_n_naive(node_embed_feats[masks])
         
-        elif self.embed_mode == 'gconcat':
-            graph_embed_feats = self.readout(g, node_embed_feats)      
+        elif self.readout_mode == 'proposed':
+            graph_embed_feats = self.readout_g(g, node_embed_feats)      
             graph_embed_feats = torch.repeat_interleave(graph_embed_feats, n_nodes, dim = 0)
-            out = self.predict(torch.hstack([node_embed_feats, graph_embed_feats])[masks])
+            out = self.readout_n(torch.hstack([node_embed_feats, graph_embed_feats])[masks])
         
         return out[:,0]
-
-
-
-
-
-
 
 
 
@@ -146,7 +141,6 @@ class PAGTNLayer(nn.Module):
         # and multiplied with the matrix. We have optimized this step
         # by having three separate matrix multiplication.
         
-
         g.ndata['src'] = self.attn_src(node_feats)
         g.ndata['dst'] = self.attn_dst(node_feats)
         edg_atn = self.attn_edg(edge_feats).unsqueeze(-2)
@@ -161,16 +155,14 @@ class PAGTNLayer(nn.Module):
 
         g.ndata['src'] = self.msg_src(node_feats)
         g.ndata['dst'] = self.msg_dst(node_feats)
-        #g.apply_edges(fn.u_add_v('src', 'dst', 'e'))
         g.apply_edges(fn.copy_src('dst', 'e'))
         atn_inp = g.edata.pop('e') + self.msg_edg(edge_feats).unsqueeze(-2)
-        #atn_inp = self.act(atn_inp)
+        
         g.edata['msg'] = atn_scores * atn_inp
         g.update_all(fn.copy_e('msg', 'm'), fn.sum('m', 'feat'))
         out = g.ndata.pop('feat') + self.wgt_n(node_feats)
         
         return out
-        #return self.act(out)
 
 
 class PAGTNGNN(nn.Module):
@@ -210,14 +202,9 @@ class PAGTNGNN(nn.Module):
         self.depth = depth
         self.nheads = nheads
         self.node_hid_feats = node_hid_feats
-        
-        
+
         self.atom_inp = nn.Linear(node_in_feats, node_hid_feats * nheads)
         
-        # self.atom_inp_1 = nn.Linear(node_in_feats, node_hid_feats)
-        # self.atom_inp_2 = nn.Linear(node_hid_feats, node_hid_feats * nheads)
-
-
         self.model = nn.ModuleList([PAGTNLayer(node_hid_feats, node_hid_feats,
                                                edge_feats, dropout,
                                                activation)
@@ -242,28 +229,14 @@ class PAGTNGNN(nn.Module):
             Updated node features.
         """
         g = g.local_var()
-        
-        #atom_input_init = self.atom_inp(node_feats)
-        #atom_input_init = self.act(atom_input_init)
-
-        #atom_input = torch.tile(atom_input_init, (1, self.nheads)).view(-1, self.nheads, self.node_hid_feats)
-        #assert torch.sum(atom_input[0][0]) == torch.sum(atom_input[0][1])
-
-        
-        # atom_input = self.atom_inp_1(node_feats)
-        # atom_input = self.act(atom_input)
-        # atom_input = self.atom_inp_2(atom_input).view(-1, self.nheads, self.node_hid_feats)
-        # atom_input = self.act(atom_input)
-        
+                
         atom_input = self.atom_inp(node_feats).view(-1, self.nheads, self.node_hid_feats)
         atom_input = self.act(atom_input)
 
-        
         atom_h = atom_input
         for i in range(self.depth):
             attn_h = self.model[i](g, atom_h, edge_feats)            
             atom_h = torch.nn.functional.relu(attn_h + atom_input)
-
         
         atom_h = atom_h.mean(1)
         

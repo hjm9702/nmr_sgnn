@@ -1,26 +1,20 @@
 import torch
 import torch.nn as nn
 
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-
 from dgl.nn.pytorch import NNConv, Set2Set
 
-from util import MC_dropout
-from sklearn.metrics import mean_absolute_error
 
+class nmr_mpnn_BASELINE(nn.Module):
 
-class nmrMPNN(nn.Module):
-
-    def __init__(self, node_in_feats, edge_in_feats, embed_mode,
+    def __init__(self, node_in_feats, edge_in_feats, readout_mode,
                  node_feats = 128,
                  num_step_message_passing = 5,
                  num_step_set2set = 3, num_layer_set2set = 1,
                  hidden_feats = 512, prob_dropout = 0.1):
         
-        super(nmrMPNN, self).__init__()
+        super(nmr_mpnn_BASELINE, self).__init__()
 
-        self.embed_mode = embed_mode
+        self.readout_mode = readout_mode
         
         self.project_node_feats = nn.Sequential(
             nn.Linear(node_in_feats, node_feats), nn.ReLU(),
@@ -41,17 +35,17 @@ class nmrMPNN(nn.Module):
         
         self.gru = nn.GRU(node_feats, node_feats)
         
-        self.readout = Set2Set(input_dim = node_feats + node_in_feats,
+        self.readout_g = Set2Set(input_dim = node_feats + node_in_feats,
                                n_iters = num_step_set2set,
                                n_layers = num_layer_set2set)
                                
-        self.predict = nn.Sequential(
+        self.readout_n = nn.Sequential(
             nn.Linear(node_feats * 3 + node_in_feats * 3, hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(hidden_feats, hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(hidden_feats, 1)
         )                           
 
-        self.predict_naive = nn.Sequential(
+        self.readout_n_naive = nn.Sequential(
             nn.Linear(node_feats + node_in_feats, hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(hidden_feats, hidden_feats), nn.ReLU(), nn.Dropout(prob_dropout),
             nn.Linear(hidden_feats, 1)
@@ -80,14 +74,14 @@ class nmrMPNN(nn.Module):
 
         node_embed_feats = embed(g)
 
-        if self.embed_mode == 'naive':
-            out = self.predict_naive(node_embed_feats[masks])
+        if self.readout_mode == 'baseline':
+            out = self.readout_n_naive(node_embed_feats[masks])
 
 
-        elif self.embed_mode == 'gconcat':
-            graph_embed_feats = self.readout(g, node_embed_feats)        
+        elif self.readout_mode == 'proposed':
+            graph_embed_feats = self.readout_g(g, node_embed_feats)        
             graph_embed_feats = torch.repeat_interleave(graph_embed_feats, n_nodes, dim = 0)
 
-            out = self.predict(torch.hstack([node_embed_feats, graph_embed_feats])[masks])
+            out = self.readout_n(torch.hstack([node_embed_feats, graph_embed_feats])[masks])
 
         return out[:,0]

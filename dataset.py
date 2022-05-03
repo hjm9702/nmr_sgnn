@@ -6,18 +6,17 @@ from dgl.convert import graph
 
 class GraphDataset():
 
-    def __init__(self, target='1H', edge_mode='bond'):
+    def __init__(self, target='1H', graph_representation='bond'):
 
         self.target = target
-        self.edge_mode = edge_mode
+        self.graph_representation = graph_representation
         self.load()
 
 
     def load(self):
-        [mol_dict] = np.load(f'./data/nmrshiftdb2_graph_{self.target}_{self.edge_mode}.npz', allow_pickle=True)['data']
+        [mol_dict] = np.load(f'./data/nmrshiftdb2_graph_{self.graph_representation}_{self.target}.npz', allow_pickle=True)['data']
 
         self.n_node = mol_dict['n_node']
-        #self.n_node_w_H = mol_dict['n_node_w_H']
         self.n_edge = mol_dict['n_edge']
         self.node_attr = mol_dict['node_attr']
         self.edge_attr = mol_dict['edge_attr']
@@ -37,9 +36,6 @@ class GraphDataset():
         g = graph((self.src[self.e_csum[idx]:self.e_csum[idx+1]], self.dst[self.e_csum[idx]:self.e_csum[idx+1]]), num_nodes = self.n_node[idx])
         g.ndata['node_attr'] = torch.from_numpy(self.node_attr[self.n_csum[idx]:self.n_csum[idx+1]]).float()
         g.edata['edge_attr'] = torch.from_numpy(self.edge_attr[self.e_csum[idx]:self.e_csum[idx+1]]).float()
-        
-        #setattr(g, 'n_node_w_H', self.n_node_w_H[idx])
-
 
         n_node = self.n_node[idx:idx+1].astype(int)
         shift = self.shift[self.n_csum[idx]:self.n_csum[idx+1]].astype(float)
