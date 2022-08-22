@@ -15,7 +15,7 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
 
 
     optimizer = Adam(net.parameters(), lr=1e-3, weight_decay=1e-10)
-    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, min_lr=1e-6, verbose=True)
+    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, min_lr=1e-7, verbose=True)
 
     max_epochs = 500
     val_log = np.zeros(max_epochs)
@@ -26,17 +26,17 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
         start_time = time.time()
         for batchidx, batchdata in enumerate(train_loader):
 
-            inputs, n_nodes, shifts, masks = batchdata
+            inputs, n_nodes, numHshifts, shift_test, shift, masks = batchdata
             
-            shifts = (shifts[masks] - train_y_mean) / train_y_std
+            shift = (shift[masks] - train_y_mean) / train_y_std
             
             inputs = inputs.to(cuda)
             n_nodes = n_nodes.to(cuda)
-            shifts = shifts.to(cuda)
+            shift = shift.to(cuda)
             masks = masks.to(cuda)
             
             pred = net(inputs, n_nodes, masks)
-            loss = torch.abs(pred - shifts).mean()
+            loss = torch.abs(pred - shift).mean()
             
             optimizer.zero_grad()
             loss.backward()
@@ -46,7 +46,7 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
     
         # validation
         val_y = np.hstack([inst[-2][inst[-1]] for inst in iter(val_loader.dataset)])
-        val_y_pred = inference(net, val_loader, train_y_mean, train_y_std, n_forward_pass = n_forward_pass)
+        val_y_pred, _ = inference(net, val_loader, train_y_mean, train_y_std, n_forward_pass = n_forward_pass)
         val_loss = mean_absolute_error(val_y, val_y_pred)
         
         val_log[epoch] = val_loss
@@ -72,11 +72,13 @@ def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass = 30, 
     net.eval()
     MC_dropout(net)
     tsty_pred = []
+    
+    start_time = time.time()
     with torch.no_grad():
         for batchidx, batchdata in enumerate(test_loader):
             inputs = batchdata[0].to(cuda)
             n_nodes = batchdata[1].to(cuda)
-            masks = batchdata[3].to(cuda)
+            masks = batchdata[-1].to(cuda)
 
             mean_list = []
 
@@ -88,4 +90,6 @@ def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass = 30, 
 
     tsty_pred = np.vstack(tsty_pred) * train_y_std + train_y_mean
     
-    return np.mean(tsty_pred, 1)
+    time_per_mol = (time.time() - start_time) / test_loader.dataset.__len__()
+
+    return np.mean(tsty_pred, 1), time_per_mol

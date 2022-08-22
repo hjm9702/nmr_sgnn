@@ -1,4 +1,3 @@
-import os, sys
 import numpy as np
 import torch
 from dgl.convert import graph
@@ -6,10 +5,11 @@ from dgl.convert import graph
 
 class GraphDataset():
 
-    def __init__(self, target='1H', graph_representation='bond'):
+    def __init__(self, target, graph_representation):
 
         self.target = target
         self.graph_representation = graph_representation
+        self.split = None
         self.load()
 
 
@@ -32,21 +32,34 @@ class GraphDataset():
         
 
     def __getitem__(self, idx):
-
         g = graph((self.src[self.e_csum[idx]:self.e_csum[idx+1]], self.dst[self.e_csum[idx]:self.e_csum[idx+1]]), num_nodes = self.n_node[idx])
         g.ndata['node_attr'] = torch.from_numpy(self.node_attr[self.n_csum[idx]:self.n_csum[idx+1]]).float()
         g.edata['edge_attr'] = torch.from_numpy(self.edge_attr[self.e_csum[idx]:self.e_csum[idx+1]]).float()
 
         n_node = self.n_node[idx:idx+1].astype(int)
-        shift = self.shift[self.n_csum[idx]:self.n_csum[idx+1]].astype(float)
-        mask = self.mask[self.n_csum[idx]:self.n_csum[idx+1]]
-        
-        return g, n_node, shift, mask
+        numHshifts = np.zeros(n_node)
+        shift = self.shift[self.n_csum[idx]:self.n_csum[idx+1]]#.astype(float)
+        shift_test = shift
+        mask = self.mask[self.n_csum[idx]:self.n_csum[idx+1]].astype(bool)
+
+        if self.target == '1H':
+            shift = np.hstack([np.mean(s) for s in self.shift[idx]])
+            
+            numHshifts = np.hstack([len(s) for s in self.shift[idx][mask]])
+            shift_test = np.hstack([np.hstack(s) for s in self.shift[idx][mask]])
+            
+            
+        return g, n_node, numHshifts, shift_test, shift, mask
         
         
     def __len__(self):
 
         return self.n_node.shape[0]
+
+
+
+
+
 
 
 
