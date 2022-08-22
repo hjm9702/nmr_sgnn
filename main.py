@@ -39,9 +39,9 @@ if not os.path.exists('./result'):
 if not os.path.isfile(f'result/result.csv'):
     with open(f'result/result.csv', 'w', newline='') as f:
         w = csv.writer(f)
-        w.writerow(['message_passing_mode', 'readout_mode', 'graph_representation', 'target', 'fold_seed', 'feat_mode', 'test_mae', 'test_rmse', 'time_per_mol'])
+        w.writerow(['message_passing_mode', 'readout_mode', 'graph_representation', 'target', 'fold_seed', 'test_mae', 'test_rmse', 'time_per_mol'])
 
 with open(f'result/result.csv', 'a', newline='') as f:
     w = csv.writer(f)
-    w.writerow([args.message_passing_mode, args.readout_mode, args.graph_representation, args.target, args.fold_seed, args.feat_mode, test_mae, test_rmse, time_per_mol])
+    w.writerow([args.message_passing_mode, args.readout_mode, args.graph_representation, args.target, args.fold_seed, test_mae, test_rmse, time_per_mol])
 
