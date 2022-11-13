@@ -8,40 +8,16 @@ from dgl.nn.pytorch import Set2Set
 
 from dgl.nn.functional import edge_softmax
 import dgl.function as fn
-import dgl
 
 
-
-class MLPNodeReadout(nn.Module):
-
-    def __init__(self, node_feats, graph_feats):
-        super(MLPNodeReadout, self).__init__()
-
-        self.project = nn.Sequential(
-            nn.Linear(node_feats, graph_feats), nn.ReLU(),
-            nn.Linear(graph_feats, graph_feats), nn.ReLU(),
-            nn.Linear(graph_feats, graph_feats), nn.ReLU(),
-            nn.Linear(graph_feats, graph_feats), nn.ReLU()
-        )
-
-    def forward(self, g, node_feats):
-
-        node_feats = self.project(node_feats)
-       
-        with g.local_scope():
-            g.ndata['h'] = node_feats
-            graph_feats = dgl.sum_nodes(g, 'h')
-
-        return graph_feats
 
 class nmr_mpnn_PROPOSED(nn.Module):
 
-    def __init__(self, node_in_feats, edge_feats, readout_mode, 
+    def __init__(self, node_in_feats, edge_feats, readout_mode,
                  node_feats,
                  pred_hid_feats, 
                  depth=5,
-                 n_heads=5,
-                 dropout=0.1,
+                 n_heads=10,
                  activation=nn.ReLU(),
                  prob_dropout = 0.1,
                  ):
@@ -49,38 +25,25 @@ class nmr_mpnn_PROPOSED(nn.Module):
         super(nmr_mpnn_PROPOSED, self).__init__()
 
         self.readout_mode = readout_mode
-
+        
         
         self.gnn = PAGTNGNN(node_in_feats, node_feats, edge_feats,
                               depth, n_heads, activation)
         
 
         
-        if self.readout_mode == 'proposed_set2set':
-            self.readout_g = Set2Set(input_dim = node_feats + node_in_feats,
-                                n_iters = 3,
-                                n_layers = 1)
-            
-            self.readout_n = nn.Sequential(
-                nn.Linear(node_feats * 3 + node_in_feats * 3, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, 1)
+        
+        self.readout_g = Set2Set(input_dim = node_feats + node_in_feats,
+                            n_iters = 3,
+                            n_layers = 1)
+        
+        self.readout_n = nn.Sequential(
+            nn.Linear(node_feats * 3 + node_in_feats * 3, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
+            nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
+            nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
+            nn.Linear(pred_hid_feats, 1)
         )
         
-        elif self.readout_mode == 'proposed_mlp':      
-            # MLPNodeReadout
-            self.readout_g = MLPNodeReadout(node_feats + node_in_feats, pred_hid_feats)
-                        
-            self.readout_n = nn.Sequential(
-                nn.Linear(node_feats + node_in_feats + pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
-                nn.Linear(pred_hid_feats, 1)
-            )
-        
-
-                               
 
         self.readout_n_naive = nn.Sequential(
             nn.Linear(node_feats + node_in_feats, pred_hid_feats), nn.PReLU(), nn.Dropout(prob_dropout),
@@ -100,7 +63,6 @@ class nmr_mpnn_PROPOSED(nn.Module):
             
             node_feats_embedding = self.gnn(g, node_feats, edge_feats)
             node_feats = torch.cat([node_feats_embedding, node_feats], dim=1)
-
             
             return node_feats
             
@@ -110,7 +72,7 @@ class nmr_mpnn_PROPOSED(nn.Module):
         if self.readout_mode == 'baseline':
             out = self.readout_n_naive(node_embed_feats[masks])
         
-        elif self.readout_mode in ['proposed_set2set', 'proposed_mlp']:
+        elif self.readout_mode == 'proposed':
             graph_embed_feats = self.readout_g(g, node_embed_feats)      
             graph_embed_feats = torch.repeat_interleave(graph_embed_feats, n_nodes, dim = 0)
             out = self.readout_n(torch.hstack([node_embed_feats, graph_embed_feats])[masks])
@@ -147,7 +109,9 @@ class PAGTNLayer(nn.Module):
         self.attn_src = nn.Linear(node_in_feats, node_in_feats)
         self.attn_dst = nn.Linear(node_in_feats, node_in_feats)
         self.attn_edg = nn.Linear(edge_feats, node_in_feats)
+        
         self.attn_dot = nn.Linear(node_in_feats, 1)
+        
         self.msg_src = nn.Linear(node_in_feats, node_out_feats)
         self.msg_dst = nn.Linear(node_in_feats, node_out_feats)
         self.msg_edg = nn.Linear(edge_feats, node_out_feats)
@@ -231,7 +195,7 @@ class PAGTNGNN(nn.Module):
                  node_hid_feats,
                  edge_feats,
                  depth=5,
-                 nheads=5,
+                 nheads=10,
                  activation=nn.ReLU()):
         super(PAGTNGNN, self).__init__()
         self.depth = depth
@@ -239,7 +203,7 @@ class PAGTNGNN(nn.Module):
         self.node_hid_feats = node_hid_feats
 
         self.atom_inp = nn.Linear(node_in_feats, node_hid_feats * nheads)
-        
+                        
         self.model = nn.ModuleList([PAGTNLayer(node_hid_feats, node_hid_feats,
                                                edge_feats,
                                                activation)
@@ -247,6 +211,7 @@ class PAGTNGNN(nn.Module):
         
         self.act = activation
 
+        
 
     def forward(self, g, node_feats, edge_feats):
         """Update node representations.

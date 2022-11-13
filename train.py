@@ -28,6 +28,8 @@ def train(args):
     node_hidden_dim = args.node_hidden_dim
     readout_n_hidden_dim = args.readout_n_hidden_dim
 
+    
+
     data_split = [0.95, 0.05]
     batch_size = 128
     

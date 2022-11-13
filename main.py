@@ -10,13 +10,13 @@ arg_parser = argparse.ArgumentParser()
 
 arg_parser.add_argument('--target', help ='13C or 1H', choices=['13C', '1H'], default='13C', type = str)
 arg_parser.add_argument('--message_passing_mode', help ='proposed or baseline', choices=['proposed', 'baseline'], default='proposed', type = str)
-arg_parser.add_argument('--readout_mode', help ='proposed or baseline', choices = ['proposed_set2set','proposed_mlp', 'baseline'], default='', type = str)
+arg_parser.add_argument('--readout_mode', help ='proposed or baseline', choices = ['proposed', 'baseline'], default='proposed', type = str)
 arg_parser.add_argument('--graph_representation', help ='sparsified or fully_connected', choices=['sparsified', 'fully_connected'], default='sparsified', type = str)
-arg_parser.add_argument('--memo', help ='settings', default='', type = str)
 arg_parser.add_argument('--fold_seed', default=0, type = int)
-arg_parser.add_argument('--node_embedding_dim', type=int)
-arg_parser.add_argument('--node_hidden_dim', type=int)
-arg_parser.add_argument('--readout_n_hidden_dim', type=int)
+arg_parser.add_argument('--node_embedding_dim', default=256, type=int)
+arg_parser.add_argument('--node_hidden_dim', default=256, type=int)
+arg_parser.add_argument('--readout_n_hidden_dim', default=256, type=int)
+
 
 
 args = arg_parser.parse_args()
