@@ -21,7 +21,6 @@ def train(args):
     message_passing_mode = args.message_passing_mode
     readout_mode = args.readout_mode
     graph_representation = args.graph_representation
-    memo = args.memo
     fold_seed = args.fold_seed
 
     node_embedding_dim = args.node_embedding_dim
@@ -37,11 +36,9 @@ def train(args):
 
     if not os.path.exists('./model'):
         os.mkdir('./model')
-    
-    if memo:
-        model_path = f'./model/{target}_{graph_representation}_{message_passing_mode}_{readout_mode}_{fold_seed}_{memo}.pt'
-    else:
-        model_path = f'./model/{target}_{graph_representation}_{message_passing_mode}_{readout_mode}_{fold_seed}.pt'
+
+
+    model_path = f'./model/{target}_{graph_representation}_{message_passing_mode}_{readout_mode}_{fold_seed}.pt'
 
     
     random_seed = 27407 + fold_seed
