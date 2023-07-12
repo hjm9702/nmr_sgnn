@@ -32,7 +32,7 @@ $ python main.py --target 13C --message_passing_mode proposed --readout_mode pro
   journal={Physical Chemistry Chemical Physics},
   volume={24},
   pages={26870--26878},
-  year={2322},
+  year={2022},
   doi={10.1039/D2CP04542G}
 }
 ```
