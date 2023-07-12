@@ -1,5 +1,5 @@
 # nmr_sgnn
-Source code for the paper: Scalable Graph Neural Network for NMR Chemical Shift Prediction
+Source code for the paper: [Scalable Graph Neural Network for NMR Chemical Shift Prediction](https://doi.org/10.1039/D2CP04542G)
 
 ## Data
 - **NMRShiftDB2** - https://nmrshiftdb.nmr.uni-koeln.de/
