@@ -24,3 +24,15 @@ Source code for the paper: [Scalable Graph Neural Network for NMR Chemical Shift
 ```shell
 $ python main.py --target 13C --message_passing_mode proposed --readout_mode proposed --graph_representation sparsified
 ```
+## Citation
+```
+@Article{nmr_sgnn,
+  title={Scalable graph neural network for {NMR} chemical shift prediction},
+  author={Han, Jongmin and Kang, Hyungu and Kang, Seokho and Kwon, Youngchun and Lee, Dongseon and Choi, Youn-Suk},
+  journal={Physical Chemistry Chemical Physics},
+  volume={24},
+  pages={26870--26878},
+  year={2322},
+  doi={10.1039/D2CP04542G}
+}
+```
