@@ -18,7 +18,7 @@ Source code for the paper: [Scalable Graph Neural Network for NMR Chemical Shift
 - **Python**
 - **Pytorch**
 - **DGL**
-- **DGLLife**
+- **DGL-LifeSci**
 - **RDKit**
 
 ## Run Code Example
