@@ -27,7 +27,8 @@ def train(args):
     node_hidden_dim = args.node_hidden_dim
     readout_n_hidden_dim = args.readout_n_hidden_dim
 
-    
+    device = args.device
+
 
     data_split = [0.95, 0.05]
     batch_size = 128
@@ -61,9 +62,9 @@ def train(args):
     edge_dim = data.edge_attr.shape[1]
 
     if message_passing_mode == 'proposed':
-        net = nmr_mpnn_PROPOSED(node_dim, edge_dim, readout_mode, node_embedding_dim, readout_n_hidden_dim).cuda()
+        net = nmr_mpnn_PROPOSED(node_dim, edge_dim, readout_mode, node_embedding_dim, readout_n_hidden_dim).to(device)
     elif message_passing_mode == 'baseline':
-        net = nmr_mpnn_BASELINE(node_dim, edge_dim, readout_mode, node_embedding_dim, node_hidden_dim, readout_n_hidden_dim).cuda()
+        net = nmr_mpnn_BASELINE(node_dim, edge_dim, readout_mode, node_embedding_dim, node_hidden_dim, readout_n_hidden_dim).to(device)
         
     
 
@@ -80,10 +81,10 @@ def train(args):
     else:
         # training
         print('-- TRAINING')
-        net = training(net, train_loader, val_loader, train_y_mean, train_y_std, model_path)
+        net = training(net, train_loader, val_loader, train_y_mean, train_y_std, model_path, device=device)
     
     # inference
-    test_y_pred, time_per_mol = inference(net, test_loader, train_y_mean, train_y_std)
+    test_y_pred, time_per_mol = inference(net, test_loader, train_y_mean, train_y_std, device=device)
     
     if target == '13C':
         test_y = np.hstack([inst[-3][inst[-1]] for inst in iter(test_loader.dataset)])
