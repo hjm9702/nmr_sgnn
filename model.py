@@ -11,11 +11,11 @@ from util import MC_dropout
 from sklearn.metrics import mean_absolute_error
 
         
-def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_path, n_forward_pass = 5, cuda = torch.device('cuda:0')):
+def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_path, n_forward_pass=5, device=torch.device('cuda:0')):
 
 
     optimizer = Adam(net.parameters(), lr=1e-3, weight_decay=1e-10)
-    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, min_lr=1e-7, verbose=True)
+    lr_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=20, min_lr=1e-7)
 
     max_epochs = 500
     val_log = np.zeros(max_epochs)
@@ -30,10 +30,10 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
             
             shift = (shift[masks] - train_y_mean) / train_y_std
             
-            inputs = inputs.to(cuda)
-            n_nodes = n_nodes.to(cuda)
-            shift = shift.to(cuda)
-            masks = masks.to(cuda)
+            inputs = inputs.to(device)
+            n_nodes = n_nodes.to(device)
+            shift = shift.to(device)
+            masks = masks.to(device)
             
             pred = net(inputs, n_nodes, masks)
             loss = torch.abs(pred - shift).mean()
@@ -43,17 +43,21 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
             optimizer.step()
             
             train_loss = loss.detach().item() * train_y_std
+
+            #import pdb; pdb.set_trace()
     
         # validation
         val_y = np.hstack([inst[-2][inst[-1]] for inst in iter(val_loader.dataset)])
-        val_y_pred, _ = inference(net, val_loader, train_y_mean, train_y_std, n_forward_pass = n_forward_pass)
+        val_y_pred, _ = inference(net, val_loader, train_y_mean, train_y_std, n_forward_pass=n_forward_pass, device=device)
         val_loss = mean_absolute_error(val_y, val_y_pred)
         
-        val_log[epoch] = val_loss
-        if epoch % 10 == 0: print('--- validation epoch %d, processed %d, train_loss %.3f, current MAE %.3f, best MAE %.3f, time elapsed(min) %.2f' %(epoch, val_loader.dataset.__len__(), train_loss, val_loss, np.min(val_log[:epoch + 1]), (time.time()-start_time)/60))
-        
+        val_log[epoch] = val_loss        
         lr_scheduler.step(val_loss)
         
+        if epoch % 10 == 0: 
+            #print(f'--- validation epoch {epoch}, processed {val_loader.dataset.__len__()}, train_loss {train_loss}, current MAE {val_loss}, best MAE {np.min(val_log[:epoch + 1])}, learning rate: {lr_scheduler.get_last_lr()}, time elapsed(min) {(time.time()-start_time)/60}')
+            print('--- validation epoch %d, processed %d, train_loss %.3f, current MAE %.3f, best MAE %.3f, time elapsed(min) %.2f' %(epoch, val_loader.dataset.__len__(), train_loss, val_loss, np.min(val_log[:epoch + 1]), (time.time()-start_time)/60))
+
         # earlystopping
         if np.argmin(val_log[:epoch + 1]) == epoch:
             torch.save(net.state_dict(), model_path) 
@@ -67,7 +71,7 @@ def training(net, train_loader, val_loader, train_y_mean, train_y_std, model_pat
     return net
     
 
-def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass = 30, cuda = torch.device('cuda:0')):
+def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass=30, device=torch.device('cuda:0')):
 
     net.eval()
     MC_dropout(net)
@@ -76,9 +80,9 @@ def inference(net, test_loader, train_y_mean, train_y_std, n_forward_pass = 30, 
     start_time = time.time()
     with torch.no_grad():
         for batchidx, batchdata in enumerate(test_loader):
-            inputs = batchdata[0].to(cuda)
-            n_nodes = batchdata[1].to(cuda)
-            masks = batchdata[-1].to(cuda)
+            inputs = batchdata[0].to(device)
+            n_nodes = batchdata[1].to(device)
+            masks = batchdata[-1].to(device)
 
             mean_list = []
 

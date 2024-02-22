@@ -22,10 +22,16 @@ Source code for the paper: [Scalable Graph Neural Network for NMR Chemical Shift
 - **RDKit**
 
 ## Run Code Example
+
 ```shell
-$ python main.py --target 13C --message_passing_mode proposed --readout_mode proposed --graph_representation sparsified
+python main.py --target 13C --message_passing_mode proposed --readout_mode proposed --graph_representation sparsified --device cpu
 ```
+
+If you want to allow the program to run in cuda, set ``--device cuda`` or ``--device cuda:0`` to specify you want to use the first Nvidia card device.
+
+
 ## Citation
+
 ```
 @Article{nmr_sgnn,
   title={Scalable graph neural network for {NMR} chemical shift prediction},

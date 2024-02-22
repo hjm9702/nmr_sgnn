@@ -156,7 +156,7 @@ class PAGTNLayer(nn.Module):
 
         g.ndata['src'] = self.msg_src(node_feats)
         g.ndata['dst'] = self.msg_dst(node_feats)
-        g.apply_edges(fn.copy_src('dst', 'e'))
+        g.apply_edges(fn.copy_u('dst', 'e'))
         atn_inp = g.edata.pop('e') + self.msg_edg(edge_feats).unsqueeze(-2)
         
         g.edata['msg'] = atn_scores * atn_inp

@@ -16,13 +16,12 @@ arg_parser.add_argument('--fold_seed', default=0, type = int)
 arg_parser.add_argument('--node_embedding_dim', default=256, type=int)
 arg_parser.add_argument('--node_hidden_dim', default=256, type=int)
 arg_parser.add_argument('--readout_n_hidden_dim', default=256, type=int)
-
-
+arg_parser.add_argument('--device', default='cpu', type=str)
 
 args = arg_parser.parse_args()
 
 print('-- CONFIGURATIONS')
-print(f'--- current mode: target: {args.target} message_passing_mode: {args.message_passing_mode}, readout_mode: {args.readout_mode}, graph_representation: {args.graph_representation}, fold_seed: {args.fold_seed}')
+print(f'--- current mode: target: {args.target} message_passing_mode: {args.message_passing_mode}, readout_mode: {args.readout_mode}, graph_representation: {args.graph_representation}, fold_seed: {args.fold_seed}, device: {args.device}')
 
 data_filename = os.path.join(data_path, f'nmrshiftdb2_graph_{args.graph_representation}_{args.target}.npz')
 
